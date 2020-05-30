@@ -2,23 +2,68 @@ import org.knowm.xchart.QuickChart;
 import org.knowm.xchart.SwingWrapper;
 import org.knowm.xchart.XYChart;
 
-public class MainFFT {
-	public static void main(String[] args) {
-		double []vectorX = generate(10, 256);
-		double MX = findM(vectorX);
-		double D = findD(vectorX, MX);
-		System.out.println("Value of M is equal to: "+MX);
-		System.out.println("Value of D is equal to: "+D);
-		print(vectorX);
 
-		makePlot(fourierF(vectorX, 256), "FFT");
+
+public class MainFFT {
+	
+	static double []vectorX;
+	static double [] h1;
+	static double [] h2;
+	static int nmbr;
+	public static void main(String[] args) throws InterruptedException {
+		for(nmbr = 64; nmbr< 2048;nmbr *=2) {
+			vectorX = generate(10, nmbr);
+			double MX = findM(vectorX);
+			double D = findD(vectorX, MX);
+			
+			long start = System.nanoTime();
+			fourierF(vectorX, nmbr);
+			long finish = System.nanoTime();
+			long timeElapsed = finish - start;
+			System.out.println("Elapsed time for fast(n="+nmbr +"): "+timeElapsed);
+			
+			long startH = System.nanoTime();
+			Thrd1 ts1 = new Thrd1();
+			Thrd2 ts2 = new Thrd2();
+			Thread t1  = new Thread(ts1);
+			Thread t2 = new Thread(ts2);
+			t1.start();
+			t2.start();
+			t2.join();
+			t1.join();
+			plusH(h1,h2);
+			long finishH = System.nanoTime();
+			long timeElapsedH = finishH - startH;
+			System.out.println("Elapsed time for half(n="+nmbr +"): "+timeElapsedH);
+		}
+		
+		
 		
 	}
+	public static class Thrd1 implements Runnable {
+		@Override
+		public void run() {
+			 h1 =fourierH(vectorX, nmbr,0);
+		}
+		}
 	
-	static double[] w=new double[256];
-	static double[] wi=new double[256];
+	public static class Thrd2 implements Runnable {
+		@Override
+		public void run() {
+			 h2 =fourierH(vectorX, nmbr,nmbr/2);
+		}
+		}
+	static double[] w=new double[nmbr];
+	static double[] wi=new double[nmbr];
 	static double omega = 900;
 	static double omega_stp= omega/10;
+	
+	public static double[] plusH(double [] h1,double [] h2) {
+		for(int i = 0;i<h1.length;i++) {
+			h1[i] += h2[i];
+		}
+		return h1;
+	}
 	
 	public static double makeA() {
 		double a = Math.random();
@@ -102,6 +147,20 @@ public static double[]/*[]*/ generate(int n, int N) {
 		}
 	}
 	
+	public static double[] fourierH(double []x,double N,int half) {
+		double[] f = new double[(int)N];
+		double[] fi = new double[(int)N];
+		for(int p = half;p<((N/2)+half);p++) {
+			//x = generate(10,(int)N);
+			for(int k = 0;k<N;k++) {
+				
+					f[p] +=x[k]*Math.cos(((2*Math.PI)/N)*(p)*k);
+					fi[p] +=x[k]*Math.sin(((2*Math.PI)/N)*(p)*k);
+			}
+			f[p]=Math.sqrt(Math.pow(f[p],2)+Math.pow(fi[p],2));
+		}
+		return f;
+	}
 
 	public static double[] fourierF(double []x,double N) {
 		double[]res = new double[(int)N];
